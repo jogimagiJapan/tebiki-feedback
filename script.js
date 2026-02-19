@@ -15,21 +15,32 @@ window.onload = () => {
     videoInput.focus();
 };
 
+/**
+ * Tebiki URLを正規化（videos形式に変換）する
+ * courses/.../play/ID 形式を videos/ID 形式に統一する
+ * @param {string} url 
+ * @returns {string|null} 正規化されたURL、または不適合ならnull
+ */
+function getCanonicalTebikiUrl(url) {
+    const val = url.trim();
+    // サブドメインを保持しつつ、videos形式とcourses形式の両方に対応
+    const tebikiRegex = /https:\/\/([\w.-]+\.tebiki\.jp)\/(?:videos|courses\/\d+\/play)\/(\d+)/;
+    const match = val.match(tebikiRegex);
+    if (match) {
+        const domain = match[1];
+        const videoId = match[2];
+        return `https://${domain}/videos/${videoId}`;
+    }
+    return null;
+}
+
 // URLバリデーション & タイトル取得
 let timeoutId;
 videoInput.addEventListener('input', () => {
     clearTimeout(timeoutId);
-    const val = videoInput.value.trim();
+    const canonicalUrl = getCanonicalTebikiUrl(videoInput.value);
 
-    // 改良版正規表現: サブドメインを保持しつつ、videos形式とcourses形式の両方に対応
-    const tebikiRegex = /https:\/\/([\w.-]+\.tebiki\.jp)\/(?:videos|courses\/\d+\/play)\/(\d+)/;
-    const match = val.match(tebikiRegex);
-
-    if (match) {
-        const domain = match[1];
-        const videoId = match[2];
-        const canonicalUrl = `https://${domain}/videos/${videoId}`;
-
+    if (canonicalUrl) {
         validation.innerHTML = '<span style="color:var(--success)">Tebiki動画URLを確認 ✅</span>';
 
         // タイトル取得（デバウンス処理）
@@ -40,9 +51,7 @@ videoInput.addEventListener('input', () => {
         timeoutId = setTimeout(() => {
             const fetchUrl = `${GAS_API_URL}?url=${encodeURIComponent(canonicalUrl)}`;
 
-            // GETリクエストでタイトル取得 (CORS許可されている前提、またはJSONP等)
-            // タイトル取得は opaque response では中身が読めないため、
-            // GAS側で適切な CORS ヘッダーが返っている必要があります。
+            // GETリクエストでタイトル取得
             fetch(fetchUrl)
                 .then(response => response.json())
                 .then(data => {
@@ -57,7 +66,7 @@ videoInput.addEventListener('input', () => {
         }, 500);
 
     } else {
-        validation.innerHTML = val ? '<span style="color:var(--accent)">無効な形式です</span>' : '';
+        validation.innerHTML = videoInput.value.trim() ? '<span style="color:var(--accent)">無効な形式です</span>' : '';
         titleBox.style.display = "none";
         currentVideoTitle = "";
     }
@@ -69,16 +78,12 @@ document.getElementById('feedbackForm').onsubmit = function (e) {
     const btn = document.getElementById('submitBtn');
     const label = document.getElementById('btnLabel');
 
-    const val = videoInput.value.trim();
-    const tebikiRegex = /https:\/\/([\w.-]+\.tebiki\.jp)\/(?:videos|courses\/\d+\/play)\/(\d+)/;
-    const match = val.match(tebikiRegex);
+    const sanitizedUrl = getCanonicalTebikiUrl(videoInput.value);
 
-    if (!match) {
+    if (!sanitizedUrl) {
         alert("有効なTebiki動画URLを入力してください。");
         return;
     }
-
-    const sanitizedUrl = `https://${match[1]}/videos/${match[2]}`;
 
     // UIを送信中に
     btn.disabled = true;
@@ -101,7 +106,6 @@ document.getElementById('feedbackForm').onsubmit = function (e) {
     /**
      * fetch POST送信 (GAS API)
      * mode: 'no-cors' を指定し、不透明なレスポンスとして処理。
-     * GASのリダイレクトによるブラウザのブロックを回避します。
      */
     fetch(GAS_API_URL, {
         method: 'POST',
@@ -112,8 +116,7 @@ document.getElementById('feedbackForm').onsubmit = function (e) {
         body: JSON.stringify(data)
     })
         .then(() => {
-            // no-cors モードではレスポンス内容が読めないため、
-            // プロミスが解決した時点で送信成功（GASへリクエストが届いた）とみなします。
+            // no-cors モードではレスポンス内容が読めないため、完了時点で成功とみなす
             document.getElementById('formContainer').style.display = 'none';
             document.getElementById('successUi').style.display = 'block';
         })
@@ -122,7 +125,6 @@ document.getElementById('feedbackForm').onsubmit = function (e) {
             alert('送信中にエラーが発生しました。ネットワーク接続等を確認してください。');
         })
         .finally(() => {
-            // UI復元
             btn.disabled = false;
             label.innerText = '送信する';
         });
