@@ -1,9 +1,12 @@
-const GAS_API_URL = 'YOUR_GAS_DEPLOY_URL';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyLiqKszS6jvCWd9LkpQ8MkIbfie_JI45gT3UP-2aKPWQdJnECFIR1kqAYP_yaDwT0/exec';
 
 const videoInput = document.getElementById('videoUrl');
 const titleBox = document.getElementById('videoTitleBox');
 const validation = document.getElementById('urlValidationMsg');
 const accountInput = document.getElementById('accountName');
+
+// タイトルの保持用
+let currentVideoTitle = "";
 
 // 初期化: アカウント名復元 & フォーカス
 window.onload = () => {
@@ -25,33 +28,38 @@ videoInput.addEventListener('input', () => {
     if (match) {
         const domain = match[1];
         const videoId = match[2];
-        // 元のドメインを維持したまま、台帳検索用の正規化URL(videos形式)を作成
         const canonicalUrl = `https://${domain}/videos/${videoId}`;
 
         validation.innerHTML = '<span style="color:var(--success)">Tebiki動画URLを確認 ✅</span>';
 
         // タイトル取得（デバウンス処理）
+        currentVideoTitle = ""; // リセット
         titleBox.innerText = "タイトルを確認中...";
         titleBox.style.display = "block";
 
         timeoutId = setTimeout(() => {
-            // fetch APIを使用したタイトル取得 (GAS doGet)
             const fetchUrl = `${GAS_API_URL}?url=${encodeURIComponent(canonicalUrl)}`;
 
+            // GETリクエストでタイトル取得 (CORS許可されている前提、またはJSONP等)
+            // タイトル取得は opaque response では中身が読めないため、
+            // GAS側で適切な CORS ヘッダーが返っている必要があります。
             fetch(fetchUrl)
                 .then(response => response.json())
                 .then(data => {
-                    titleBox.innerText = `タイトル: ${data.title || '取得できませんでした'}`;
+                    currentVideoTitle = data.title || "不明なタイトル";
+                    titleBox.innerText = `タイトル: ${currentVideoTitle}`;
                 })
                 .catch(error => {
                     console.error('Error fetching title:', error);
-                    titleBox.innerText = "タイトルの取得に失敗しました";
+                    titleBox.innerText = "タイトルの取得に失敗しました (台帳未登録)";
+                    currentVideoTitle = "タイトル取得失敗";
                 });
         }, 500);
 
     } else {
         validation.innerHTML = val ? '<span style="color:var(--accent)">無効な形式です</span>' : '';
         titleBox.style.display = "none";
+        currentVideoTitle = "";
     }
 });
 
@@ -61,7 +69,6 @@ document.getElementById('feedbackForm').onsubmit = function (e) {
     const btn = document.getElementById('submitBtn');
     const label = document.getElementById('btnLabel');
 
-    // URLの再サニタイズ（送信データ用）
     const val = videoInput.value.trim();
     const tebikiRegex = /https:\/\/([\w.-]+\.tebiki\.jp)\/(?:videos|courses\/\d+\/play)\/(\d+)/;
     const match = val.match(tebikiRegex);
@@ -83,6 +90,7 @@ document.getElementById('feedbackForm').onsubmit = function (e) {
     // フォームデータ
     const data = {
         videoUrl: sanitizedUrl,
+        videoTitle: currentVideoTitle,
         timeMin: document.getElementById('timeMin').value,
         timeSec: document.getElementById('timeSec').value,
         category: document.getElementById('category').value,
@@ -90,36 +98,42 @@ document.getElementById('feedbackForm').onsubmit = function (e) {
         accountName: accountInput.value
     };
 
-    // fetch APIを使用したデータ送信 (GAS doPost)
+    /**
+     * fetch POST送信 (GAS API)
+     * mode: 'no-cors' を指定し、不透明なレスポンスとして処理。
+     * GASのリダイレクトによるブラウザのブロックを回避します。
+     */
     fetch(GAS_API_URL, {
         method: 'POST',
+        mode: 'no-cors',
+        headers: {
+            'Content-Type': 'text/plain'
+        },
         body: JSON.stringify(data)
     })
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
         .then(() => {
+            // no-cors モードではレスポンス内容が読めないため、
+            // プロミスが解決した時点で送信成功（GASへリクエストが届いた）とみなします。
             document.getElementById('formContainer').style.display = 'none';
             document.getElementById('successUi').style.display = 'block';
         })
         .catch(error => {
-            console.error('Error submitting form:', error);
-            alert('送信に失敗しました。時間をおいて再度お試しください。');
+            console.error('Submission error:', error);
+            alert('送信中にエラーが発生しました。ネットワーク接続等を確認してください。');
         })
         .finally(() => {
-            // UI復元 (エラー時のみ意味があるが共通処理として記述)
+            // UI復元
             btn.disabled = false;
             label.innerText = '送信する';
         });
 };
 
-// 文字数
+// 文字数制限の表示
 document.getElementById('details').oninput = function () {
     document.getElementById('charCount').innerText = `${this.value.length} / 500`;
 };
 
-// Modal
+// ヘルプモーダルの制御
 const modal = document.getElementById('helpModal');
 document.getElementById('helpTrigger').onclick = () => modal.style.display = 'flex';
 document.getElementById('closeHelp').onclick = () => modal.style.display = 'none';
