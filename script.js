@@ -1,133 +1,126 @@
-/**
- * Tebiki動画改善フィードバック収集ツール - Frontend (JS)
- */
+const GAS_API_URL = 'YOUR_GAS_DEPLOY_URL';
 
-// GAS Web App URL
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzldyY9xFc0nRjlfO_FhSK574x-vNNjuI9RfQCHLG1k27JiC53b9iHS0kaMvq-hIww/exec';
+const videoInput = document.getElementById('videoUrl');
+const titleBox = document.getElementById('videoTitleBox');
+const validation = document.getElementById('urlValidationMsg');
+const accountInput = document.getElementById('accountName');
 
-document.addEventListener('DOMContentLoaded', () => {
-    const feedbackForm = document.getElementById('feedback-form');
-    const videoUrlInput = document.getElementById('video-url');
-    const videoTitleContainer = document.getElementById('video-title-container');
-    const videoTitleDisplay = document.getElementById('video-title');
-    const userNameInput = document.getElementById('user-name');
-    const submitBtn = document.getElementById('submit-btn');
-    const formContainer = document.getElementById('form-container');
-    const successContainer = document.getElementById('success-container');
-    const resetBtn = document.getElementById('reset-btn');
+// 初期化: アカウント名復元 & フォーカス
+window.onload = () => {
+    const saved = localStorage.getItem('tebikiAccount');
+    if (saved) accountInput.value = saved;
+    videoInput.focus();
+};
 
-    // 1. LocalStorageから名前を復元
-    const storedName = localStorage.getItem('tebiki_user_name');
-    if (storedName) {
-        userNameInput.value = storedName;
-    }
+// URLバリデーション & タイトル取得
+let timeoutId;
+videoInput.addEventListener('input', () => {
+    clearTimeout(timeoutId);
+    const val = videoInput.value.trim();
 
-    // 2. URL入力時のタイトル取得ロジック
-    videoUrlInput.addEventListener('input', debounce(() => {
-        const url = videoUrlInput.value.trim();
-        const videoIdMatch = url.match(/videos\/(\d+)/);
+    // 改良版正規表現: サブドメインを保持しつつ、videos形式とcourses形式の両方に対応
+    const tebikiRegex = /https:\/\/([\w.-]+\.tebiki\.jp)\/(?:videos|courses\/\d+\/play)\/(\d+)/;
+    const match = val.match(tebikiRegex);
 
-        if (videoIdMatch) {
-            const videoId = `videos/${videoIdMatch[1]}`;
-            fetchVideoTitle(videoId);
-        } else {
-            hideVideoTitle();
-        }
-    }, 500));
+    if (match) {
+        const domain = match[1];
+        const videoId = match[2];
+        // 元のドメインを維持したまま、台帳検索用の正規化URL(videos形式)を作成
+        const canonicalUrl = `https://${domain}/videos/${videoId}`;
 
-    // 3. フォーム送信処理
-    feedbackForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
+        validation.innerHTML = '<span style="color:var(--success)">Tebiki動画URLを確認 ✅</span>';
 
-        // 二重送信防止
-        submitBtn.disabled = true;
-        submitBtn.querySelector('.spinner').classList.remove('hide');
-        submitBtn.querySelector('.btn-text').textContent = '送信中...';
+        // タイトル取得（デバウンス処理）
+        titleBox.innerText = "タイトルを確認中...";
+        titleBox.style.display = "block";
 
-        const formData = {
-            url: videoUrlInput.value.trim(),
-            title: videoTitleDisplay.textContent || 'タイトル取得不可',
-            category: document.getElementById('category').value,
-            feedback: document.getElementById('feedback').value.trim(),
-            userName: userNameInput.value.trim()
-        };
+        timeoutId = setTimeout(() => {
+            // fetch APIを使用したタイトル取得 (GAS doGet)
+            const fetchUrl = `${GAS_API_URL}?url=${encodeURIComponent(canonicalUrl)}`;
 
-        // 名前をLocalStorageに保存
-        localStorage.setItem('tebiki_user_name', formData.userName);
+            fetch(fetchUrl)
+                .then(response => response.json())
+                .then(data => {
+                    titleBox.innerText = `タイトル: ${data.title || '取得できませんでした'}`;
+                })
+                .catch(error => {
+                    console.error('Error fetching title:', error);
+                    titleBox.innerText = "タイトルの取得に失敗しました";
+                });
+        }, 500);
 
-        try {
-            const response = await fetch(GAS_URL, {
-                method: 'POST',
-                mode: 'no-cors', // CORSを避けるための設定（レスポンスは読めないが送信は可能）
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-
-            // no-cors の場合、エラーでも成功でも不透明なレスポンスが返るため
-            // 送信完了とみなしてUIを切り替える
-            showSuccess();
-
-        } catch (error) {
-            console.error('Submission error:', error);
-            alert('送信中にエラーが発生しました。時間をおいて再度お試しください。');
-            submitBtn.disabled = false;
-            submitBtn.querySelector('.spinner').classList.add('hide');
-            submitBtn.querySelector('.btn-text').textContent = '送信する';
-        }
-    });
-
-    // 4. 「続けて報告する」ボタン
-    resetBtn.addEventListener('click', () => {
-        feedbackForm.reset();
-        // 名前は残す
-        const storedName = localStorage.getItem('tebiki_user_name');
-        if (storedName) userNameInput.value = storedName;
-
-        hideVideoTitle();
-        successContainer.classList.add('hide');
-        formContainer.classList.remove('hide');
-        submitBtn.disabled = false;
-        submitBtn.querySelector('.spinner').classList.add('hide');
-        submitBtn.querySelector('.btn-text').textContent = '送信する';
-    });
-
-    // --- Helper Functions ---
-
-    async function fetchVideoTitle(videoId) {
-        try {
-            const response = await fetch(`${GAS_URL}?id=${videoId}`);
-            const data = await response.json();
-
-            if (data.title) {
-                videoTitleDisplay.textContent = `動画：${data.title}`;
-                videoTitleContainer.classList.remove('hide');
-            } else {
-                hideVideoTitle();
-            }
-        } catch (error) {
-            console.warn('Title fetch error:', error);
-            hideVideoTitle();
-        }
-    }
-
-    function hideVideoTitle() {
-        videoTitleContainer.classList.add('hide');
-        videoTitleDisplay.textContent = '';
-    }
-
-    function showSuccess() {
-        formContainer.classList.add('hide');
-        successContainer.classList.remove('hide');
-        successContainer.classList.add('fade-in');
-    }
-
-    function debounce(func, wait) {
-        let timeout;
-        return function (...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
+    } else {
+        validation.innerHTML = val ? '<span style="color:var(--accent)">無効な形式です</span>' : '';
+        titleBox.style.display = "none";
     }
 });
+
+// 送信処理
+document.getElementById('feedbackForm').onsubmit = function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    const label = document.getElementById('btnLabel');
+
+    // URLの再サニタイズ（送信データ用）
+    const val = videoInput.value.trim();
+    const tebikiRegex = /https:\/\/([\w.-]+\.tebiki\.jp)\/(?:videos|courses\/\d+\/play)\/(\d+)/;
+    const match = val.match(tebikiRegex);
+
+    if (!match) {
+        alert("有効なTebiki動画URLを入力してください。");
+        return;
+    }
+
+    const sanitizedUrl = `https://${match[1]}/videos/${match[2]}`;
+
+    // UIを送信中に
+    btn.disabled = true;
+    label.innerHTML = '<div class="spinner"></div>';
+
+    // メアド保存
+    localStorage.setItem('tebikiAccount', accountInput.value);
+
+    // フォームデータ
+    const data = {
+        videoUrl: sanitizedUrl,
+        timeMin: document.getElementById('timeMin').value,
+        timeSec: document.getElementById('timeSec').value,
+        category: document.getElementById('category').value,
+        details: document.getElementById('details').value,
+        accountName: accountInput.value
+    };
+
+    // fetch APIを使用したデータ送信 (GAS doPost)
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify(data)
+    })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(() => {
+            document.getElementById('formContainer').style.display = 'none';
+            document.getElementById('successUi').style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Error submitting form:', error);
+            alert('送信に失敗しました。時間をおいて再度お試しください。');
+        })
+        .finally(() => {
+            // UI復元 (エラー時のみ意味があるが共通処理として記述)
+            btn.disabled = false;
+            label.innerText = '送信する';
+        });
+};
+
+// 文字数
+document.getElementById('details').oninput = function () {
+    document.getElementById('charCount').innerText = `${this.value.length} / 500`;
+};
+
+// Modal
+const modal = document.getElementById('helpModal');
+document.getElementById('helpTrigger').onclick = () => modal.style.display = 'flex';
+document.getElementById('closeHelp').onclick = () => modal.style.display = 'none';
+window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };

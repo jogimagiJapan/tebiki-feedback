@@ -1,72 +1,102 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tebiki動画改善フィードバック収集ツール</title>
+    <title>Tebiki Feedback Hub</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
-    <div class="mesh-gradient"></div>
-    
-    <main class="container">
-        <header class="header">
-            <h1>Tebiki Feedback Tool</h1>
-            <p class="subtitle">動画マニュアルの品質向上にご協力ください</p>
+
+    <div class="container" id="formContainer">
+        <header>
+            <div class="logo-badge">Feedback System</div>
+            <h1>Tebiki Feedback Hub</h1>
+            <p class="subtitle">動画マニュアルの改善にご協力いただきありがとうございます。</p>
         </header>
 
-        <section id="form-container" class="glass-card">
-            <form id="feedback-form">
-                <div class="input-group">
-                    <label for="video-url">動画URL</label>
-                    <input type="url" id="video-url" placeholder="https://tebiki.jp/tenant/.../videos/12345" required>
+        <form id="feedbackForm">
+            <!-- URL Section -->
+            <div class="form-group">
+                <label for="videoUrl">動画URL <span style="color:var(--accent)">*</span></label>
+                <div class="url-row">
+                    <input type="text" id="videoUrl" name="videoUrl" placeholder="URLをペーストしてください" required
+                        autocomplete="off">
+                    <button type="button" class="url-help-btn" id="helpTrigger" title="URLの取得方法">?</button>
                 </div>
+                <div id="urlValidationMsg" class="validation-msg"></div>
+                <div id="videoTitleBox" class="video-title-box"></div>
+            </div>
 
-                <div id="video-title-container" class="fade-in hide">
-                    <p id="video-title"></p>
+            <!-- Info Grid -->
+            <div class="grid">
+                <div class="form-group">
+                    <label>指摘箇所の時間</label>
+                    <div class="time-inputs">
+                        <input type="number" id="timeMin" name="timeMin" min="0" value="0">
+                        <span>分</span>
+                        <input type="number" id="timeSec" name="timeSec" min="0" max="59" value="0">
+                        <span>秒</span>
+                    </div>
                 </div>
-
-                <div class="input-group">
-                    <label for="category">改善カテゴリ</label>
-                    <select id="category" required>
-                        <option value="" disabled selected>選択してください</option>
-                        <option value="音声・説明">音声・説明（聞き取りにくい、間違っている）</option>
-                        <option value="映像・テロップ">映像・テロップ（見にくい、消えるのが早い）</option>
-                        <option value="内容・構成">内容・構成（手順が古い、分かりにくい）</option>
+                <div class="form-group">
+                    <label for="category">報告カテゴリ</label>
+                    <select id="category" name="category" required>
+                        <option value="" disabled selected>選択...</option>
+                        <option value="内容不備">内容不備</option>
+                        <option value="手順変更">手順変更</option>
+                        <option value="質問">質問</option>
+                        <option value="改善提案">改善提案</option>
                         <option value="その他">その他</option>
                     </select>
                 </div>
-
-                <div class="input-group">
-                    <label for="feedback">具体的な改善提案</label>
-                    <textarea id="feedback" rows="4" placeholder="例：3:15付近のテロップの内容が古い手順になっています。" required></textarea>
-                </div>
-
-                <div class="input-group">
-                    <label for="user-name">投稿者氏名</label>
-                    <input type="text" id="user-name" placeholder="お名前を入力してください" required>
-                </div>
-
-                <button type="submit" id="submit-btn">
-                    <span class="btn-text">送信する</span>
-                    <div class="spinner hide"></div>
-                </button>
-            </form>
-        </section>
-
-        <section id="success-container" class="glass-card hide">
-            <div class="success-message">
-                <div class="success-icon">✓</div>
-                <h2>送信が完了しました！</h2>
-                <p>フィードバックありがとうございます。<br>あなたの声がより良いマニュアル作りに繋がります。</p>
-                <button id="reset-btn" class="secondary-btn">続けて報告する</button>
             </div>
-        </section>
-    </main>
 
-    <script src="script.js"></script>
+            <!-- Details -->
+            <div class="form-group">
+                <label for="details">報告内容の詳細 <span style="color:var(--accent)">*</span></label>
+                <textarea id="details" name="details" placeholder="具体的にご記入ください" required maxlength="500"></textarea>
+                <div style="text-align:right; font-size:0.75rem; color:var(--text-muted); margin-top:4px;"
+                    id="charCount">0 / 500</div>
+            </div>
+
+            <!-- Account -->
+            <div class="form-group">
+                <label for="accountName">あなたのアカウント名 <span style="color:var(--accent)">*</span></label>
+                <div class="email-field">
+                    <input type="text" id="accountName" name="accountName" placeholder="例: shukai.kawaoka" required>
+                    <div class="domain-badge">@tuzuki.com</div>
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+                <span id="btnLabel">送信する</span>
+            </button>
+        </form>
+    </div>
+
+    <!-- Success UI -->
+    <div class="container success-ui" id="successUi">
+        <div style="font-size: 4rem; margin-bottom: 20px;">✅</div>
+        <h2 style="font-size: 1.8rem; color: var(--primary); margin-bottom: 12px;">送信完了</h2>
+        <p style="color: var(--text-muted); margin-bottom: 32px;">フィードバックを承りました。<br>改善に役立たせていただきます。</p>
+        <button class="submit-btn" onclick="location.reload()">新しい報告を作成</button>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal" id="helpModal">
+        <div class="modal-card">
+            <button class="close-btn" id="closeHelp">&times;</button>
+            <h3 style="color: var(--primary); margin-bottom: 12px;">動画URLの取得方法</h3>
+            <p style="font-size: 0.9rem; color: var(--text-muted);">Tebiki画面内の「共有（クリップマーク）」からURLをコピーしてください。</p>
+            <img src="https://drive.google.com/uc?export=view&id=1-E-_gIJQSAoGK4ThGh1lIdJhlEhAZIVm" alt="Help"
+                class="modal-img">
+        </div>
+    </div>
+
+    <script src="script.js" defer></script>
 </body>
+
 </html>
