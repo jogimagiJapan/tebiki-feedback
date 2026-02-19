@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tebiki動画改善フィードバック収集ツール</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="mesh-gradient"></div>
+    
+    <main class="container">
+        <header class="header">
+            <h1>Tebiki Feedback Tool</h1>
+            <p class="subtitle">動画マニュアルの品質向上にご協力ください</p>
+        </header>
+
+        <section id="form-container" class="glass-card">
+            <form id="feedback-form">
+                <div class="input-group">
+                    <label for="video-url">動画URL</label>
+                    <input type="url" id="video-url" placeholder="https://tebiki.jp/tenant/.../videos/12345" required>
+                </div>
+
+                <div id="video-title-container" class="fade-in hide">
+                    <p id="video-title"></p>
+                </div>
+
+                <div class="input-group">
+                    <label for="category">改善カテゴリ</label>
+                    <select id="category" required>
+                        <option value="" disabled selected>選択してください</option>
+                        <option value="音声・説明">音声・説明（聞き取りにくい、間違っている）</option>
+                        <option value="映像・テロップ">映像・テロップ（見にくい、消えるのが早い）</option>
+                        <option value="内容・構成">内容・構成（手順が古い、分かりにくい）</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="feedback">具体的な改善提案</label>
+                    <textarea id="feedback" rows="4" placeholder="例：3:15付近のテロップの内容が古い手順になっています。" required></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label for="user-name">投稿者氏名</label>
+                    <input type="text" id="user-name" placeholder="お名前を入力してください" required>
+                </div>
+
+                <button type="submit" id="submit-btn">
+                    <span class="btn-text">送信する</span>
+                    <div class="spinner hide"></div>
+                </button>
+            </form>
+        </section>
+
+        <section id="success-container" class="glass-card hide">
+            <div class="success-message">
+                <div class="success-icon">✓</div>
+                <h2>送信が完了しました！</h2>
+                <p>フィードバックありがとうございます。<br>あなたの声がより良いマニュアル作りに繋がります。</p>
+                <button id="reset-btn" class="secondary-btn">続けて報告する</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
